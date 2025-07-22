@@ -33,7 +33,7 @@ Below is a breakdown of the app’s features, how they will be implemented, and 
 
 #### Technical Stack and Integration
 - **Frontend**: SvelteKit for a responsive, modern UI, leveraging your expertise for quick development.
-- **Backend**: Node.js with Express for API handling, ensuring compatibility with Qloo’s and LLM APIs.
+- **Backend**: SvelteKit as a full stack project, ensuring compatibility with Qloo’s and LLM APIs.
 - **APIs**:
   - **Qloo’s Taste AI™ API**: For cultural preference-based recommendations. Research suggests it supports `/search` and `/recs` endpoints, with parameters for categories (e.g., `category: 'restaurants'`, `category: 'travel'`). Assumes sufficient metadata (e.g., name, location, cuisine type) is provided.
   - **LLM API**: Perplexity Sonar AI or Gemini for mood-based chat, chosen for their natural language understanding capabilities. Exa Search can be used for fetching real-time online information if needed.
