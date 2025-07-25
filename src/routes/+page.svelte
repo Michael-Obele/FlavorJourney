@@ -2,6 +2,54 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
+
+	const features = [
+		{
+			title: 'Hyper-Personalized Recommendations',
+			content:
+				'Leveraging advanced AI, we provide tailored restaurant and travel suggestions that resonate with your unique cultural preferences and evolving tastes.',
+			buttonText: 'Learn More →',
+			delay: 'delay-100'
+		},
+		{
+			title: 'Intuitive Mood-Based Discovery',
+			content:
+				'Simply articulate your current mood or craving, and our intelligent system will curate the perfect culinary or travel experience just for you.',
+			buttonText: 'Discover How →',
+			delay: 'delay-200'
+		},
+		{
+			title: 'Vibrant Global Community',
+			content:
+				'Share your culinary discoveries, rate unique recommendations, and connect with a passionate community of fellow food and travel enthusiasts worldwide.',
+			buttonText: 'Join the Community →',
+			delay: 'delay-300'
+		}
+	];
+
+	const howItWorksSteps = [
+		{
+			step: 'Step One',
+			title: 'Define Your Culinary Profile',
+			content:
+				'Input your preferred cuisines, dietary needs, and even your favorite music or films to refine your unique taste profile.',
+			delay: 'delay-100'
+		},
+		{
+			step: 'Step Two',
+			title: 'Receive AI-Curated Journeys',
+			content:
+				'Get instant, tailored suggestions for local dining spots, hidden gems, and travel destinations perfectly aligned with your desires.',
+			delay: 'delay-200'
+		},
+		{
+			step: 'Step Three',
+			title: 'Explore, Savor & Share',
+			content:
+				'Embark on new experiences, capture your moments, and effortlessly share your culinary and travel adventures with the FlavorJourney community.',
+			delay: 'delay-300'
+		}
+	];
 </script>
 
 <!-- Hero Section - Immersive Introduction -->
@@ -46,149 +94,65 @@
 
 <!-- Features Section - Interactive Cards -->
 <section class="grid gap-10 bg-gray-50 px-8 py-20 md:grid-cols-2 lg:grid-cols-3 dark:bg-gray-950">
-	<Card
-		class="group animate-fade-in-up transform overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl transition-all delay-100 duration-500 ease-out hover:-translate-y-2 hover:shadow-2xl dark:border-gray-700 dark:bg-gray-800"
-	>
-		<CardHeader>
-			<CardTitle
-				class="text-2xl font-bold text-gray-900 transition-colors duration-300 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400"
-			>
-				Hyper-Personalized Recommendations
-			</CardTitle>
-		</CardHeader>
-		<CardContent class="text-gray-700 dark:text-gray-300">
-			Leveraging advanced AI, we provide tailored restaurant and travel suggestions that resonate
-			with your unique cultural preferences and evolving tastes.
-		</CardContent>
-		<CardFooter class="pt-4">
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-purple-600 transition-transform duration-300 group-hover:translate-x-1 dark:text-purple-400"
-			>
-				Learn More →
-			</Button>
-		</CardFooter>
-	</Card>
-	<Card
-		class="group animate-fade-in-up transform overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl transition-all delay-200 duration-500 ease-out hover:-translate-y-2 hover:shadow-2xl dark:border-gray-700 dark:bg-gray-800"
-	>
-		<CardHeader>
-			<CardTitle
-				class="text-2xl font-bold text-gray-900 transition-colors duration-300 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400"
-			>
-				Intuitive Mood-Based Discovery
-			</CardTitle>
-		</CardHeader>
-		<CardContent class="text-gray-700 dark:text-gray-300">
-			Simply articulate your current mood or craving, and our intelligent system will curate the
-			perfect culinary or travel experience just for you.
-		</CardContent>
-		<CardFooter class="pt-4">
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-purple-600 transition-transform duration-300 group-hover:translate-x-1 dark:text-purple-400"
-			>
-				Discover How →
-			</Button>
-		</CardFooter>
-	</Card>
-	<Card
-		class="group animate-fade-in-up transform overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl transition-all delay-300 duration-500 ease-out hover:-translate-y-2 hover:shadow-2xl dark:border-gray-700 dark:bg-gray-800"
-	>
-		<CardHeader>
-			<CardTitle
-				class="text-2xl font-bold text-gray-900 transition-colors duration-300 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400"
-			>
-				Vibrant Global Community
-			</CardTitle>
-		</CardHeader>
-		<CardContent class="text-gray-700 dark:text-gray-300">
-			Share your culinary discoveries, rate unique recommendations, and connect with a passionate
-			community of fellow food and travel enthusiasts worldwide.
-		</CardContent>
-		<CardFooter class="pt-4">
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-purple-600 transition-transform duration-300 group-hover:translate-x-1 dark:text-purple-400"
-			>
-				Join the Community →
-			</Button>
-		</CardFooter>
-	</Card>
+	{#each features as feature (feature.title)}
+		<Card
+			class="group animate-fade-in-up transform overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl transition-all {feature.delay} duration-500 ease-out hover:-translate-y-2 hover:shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+		>
+			<CardHeader>
+				<CardTitle
+					class="text-2xl font-bold text-gray-900 transition-colors duration-300 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400"
+				>
+					{feature.title}
+				</CardTitle>
+			</CardHeader>
+			<CardContent class="text-gray-700 dark:text-gray-300">
+				{feature.content}
+			</CardContent>
+			<CardFooter class="pt-4">
+				<Button
+					variant="ghost"
+					size="sm"
+					class="text-purple-600 transition-transform duration-300 group-hover:translate-x-1 dark:text-purple-400"
+				>
+					{feature.buttonText}
+				</Button>
+			</CardFooter>
+		</Card>
+	{/each}
 </section>
 
 <!-- How It Works Section - Dynamic Steps -->
-<section class="flex flex-col items-center bg-white px-8 py-20 dark:bg-gray-900">
+<section class="flex flex-col items-center bg-white px-8 py-20 dark:bg-gray-950">
 	<h2 class="font-display mb-16 text-center text-5xl font-bold text-gray-900 dark:text-white">
 		Your FlavorJourney: Simple Steps to Discovery
 	</h2>
 	<div class="grid w-full max-w-6xl gap-12 md:grid-cols-3">
-		<Card
-			class="dark:bg-gray-850 animate-fade-in-up group rounded-xl border border-gray-200 bg-gray-100 p-8 text-center shadow-md delay-100 dark:border-gray-700"
-		>
-			<Badge
-				variant="secondary"
-				class="mb-6 rounded-full bg-purple-200 px-4 py-2 text-lg text-purple-800 dark:bg-purple-800 dark:text-purple-200"
+		{#each howItWorksSteps as step (step.step)}
+			<Card
+				class="animate-fade-in-up group rounded-xl border border-gray-200 bg-purple-50 p-8 text-center shadow-md {step.delay} dark:border-gray-700 dark:bg-purple-900"
 			>
-				Step One
-			</Badge>
-			<h3
-				class="mb-4 text-2xl font-semibold text-gray-900 transition-colors duration-300 group-hover:text-pink-600 dark:text-white dark:group-hover:text-pink-400"
-			>
-				Define Your Culinary Profile
-			</h3>
-			<p class="text-gray-700 dark:text-gray-300">
-				Input your preferred cuisines, dietary needs, and even your favorite music or films to
-				refine your unique taste profile.
-			</p>
-		</Card>
-		<Card
-			class="dark:bg-gray-850 animate-fade-in-up group rounded-xl border border-gray-200 bg-gray-100 p-8 text-center shadow-md delay-200 dark:border-gray-700"
-		>
-			<Badge
-				variant="secondary"
-				class="mb-6 rounded-full bg-purple-200 px-4 py-2 text-lg text-purple-800 dark:bg-purple-800 dark:text-purple-200"
-			>
-				Step Two
-			</Badge>
-			<h3
-				class="mb-4 text-2xl font-semibold text-gray-900 transition-colors duration-300 group-hover:text-pink-600 dark:text-white dark:group-hover:text-pink-400"
-			>
-				Receive AI-Curated Journeys
-			</h3>
-			<p class="text-gray-700 dark:text-gray-300">
-				Get instant, tailored suggestions for local dining spots, hidden gems, and travel
-				destinations perfectly aligned with your desires.
-			</p>
-		</Card>
-		<Card
-			class="dark:bg-gray-850 animate-fade-in-up group rounded-xl border border-gray-200 bg-gray-100 p-8 text-center shadow-md delay-300 dark:border-gray-700"
-		>
-			<Badge
-				variant="secondary"
-				class="mb-6 rounded-full bg-purple-200 px-4 py-2 text-lg text-purple-800 dark:bg-purple-800 dark:text-purple-200"
-			>
-				Step Three
-			</Badge>
-			<h3
-				class="mb-4 text-2xl font-semibold text-gray-900 transition-colors duration-300 group-hover:text-pink-600 dark:text-white dark:group-hover:text-pink-400"
-			>
-				Explore, Savor & Share
-			</h3>
-			<p class="text-gray-700 dark:text-gray-300">
-				Embark on new experiences, capture your moments, and effortlessly share your culinary and
-				travel adventures with the FlavorJourney community.
-			</p>
-		</Card>
+				<Badge
+					variant="secondary"
+					class="mb-6 rounded-full bg-purple-200 px-4 py-2 text-lg text-purple-800 dark:bg-purple-800 dark:text-purple-200"
+				>
+					{step.step}
+				</Badge>
+				<h3
+					class="mb-4 text-2xl font-semibold text-gray-900 transition-colors duration-300 group-hover:text-pink-600 dark:text-white dark:group-hover:text-pink-400"
+				>
+					{step.title}
+				</h3>
+				<p class="text-gray-700 dark:text-gray-300">
+					{step.content}
+				</p>
+			</Card>
+		{/each}
 	</div>
 </section>
 
 <!-- Call to Action Section - Emotional Appeal -->
 <section
-	class="animate-fade-in-up flex flex-col items-center bg-gradient-to-r from-pink-500 to-purple-600 text-center text-white shadow-inner"
+	class="animate-fade-in-up flex flex-col items-center bg-gradient-to-r from-pink-500 to-purple-600 px-8 py-24 text-center text-white shadow-inner"
 >
 	<h2 class="font-display mb-8 max-w-4xl text-5xl leading-tight font-extrabold">
 		Ready to Redefine Your Culinary & Travel Horizons?
