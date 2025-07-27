@@ -222,24 +222,3 @@
 		</ul>
 	</div>
 </footer>
-
-<style lang="postcss">
-	/* Global styles based on design plan */
-	body {
-		font-family: 'Inter', sans-serif;
-	}
-
-	@layer base {
-		:root {
-			--font-display: 'Plus Jakarta Sans', sans-serif;
-		}
-
-		.font-display {
-			font-family: var(--font-display);
-		}
-
-		.variable-font-weight {
-			font-weight: 500;
-		}
-	}
-</style>
