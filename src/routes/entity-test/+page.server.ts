@@ -78,14 +78,14 @@ interface QlooEntity {
 	types: string[];
 	properties: Properties;
 	popularity?: number;
-	tags: Tag[];
+	references: Tag[];
 	disambiguation?: string;
 	location?: Location;
 }
 
 export const load: PageServerLoad = async ({ url }) => {
 	// const entityId = url.searchParams.get('entity_id');
-	const entityId = 'F6754C46-B3E7-457F-8B7E-06C613597320';
+	const entityId = '57FBCDD8-6840-468C-BECC-D0F92375BDD7';
 
 	if (!entityId) {
 		return {
@@ -111,24 +111,14 @@ export const load: PageServerLoad = async ({ url }) => {
 	};
 
 	try {
-		const response = await fetch(
-			`${qlooApiUrl}entities?entity_ids=${entityId}&external.facebook.ids=&external.goodreads.ids=&external.goodreads_author.ids=&external.igdb.ids=&external.imdb.ids=&external.instagram.ids=&external.isbn10.ids=&external.isbn13.ids=&external.itunes.ids=&external.lastfm.ids=&external.library_of_congress.ids=&external.metacritic.ids=&external.michelin.ids=&external.musicbrainz.ids=&external.rottentomatoes.ids=&external.soundcloud.ids=&external.spotify.ids=&external.tablet.ids=&external.twitch.ids=&external.twitter.ids=&external.wikidata.ids=&external.resy.ids=`,
-			options
-		);
+		const response = await fetch(`${qlooApiUrl}entities?entity_ids=${entityId}`, options);
 
 		if (response.status === 200) {
-			const result: { entities: QlooEntity[] } = await response.json();
+			const result: { results: QlooEntity[] } = await response.json();
 			console.log(result);
-			if (result.entities && result.entities.length > 0) {
-				return {
-					entity: result.entities[0]
-				};
-			} else {
-				return {
-					status: 404,
-					error: new Error('Entity not found.')
-				};
-			}
+			return {
+				entity: result.results[0]
+			};
 		} else {
 			return {
 				status: response.status,

@@ -12,14 +12,45 @@
 	import { enhance } from '$app/forms';
 	import { RadioGroup, RadioGroupItem } from '$lib/components/ui/radio-group';
 	import { Label } from '$lib/components/ui/label';
-	import type { PageProps } from './$types';
+	import * as Select from '$lib/components/ui/select'; // Import all from select
+	import type { PageData } from './$types';
+	import type { QlooEntity, Tag } from './+page.server'; // Import necessary types
+
+	interface ActionData {
+		success: boolean;
+		qlooEntityIds: Record<string, QlooEntity[] | null>;
+		qlooTagIds: Record<string, Tag[] | null>;
+		priceRange: string | undefined;
+		message?: string; // Add message for error cases
+		insights?: {
+			success: boolean;
+			results: {
+				entities: QlooEntity[];
+			};
+		};
+	}
+
+	type PageProps = {
+		form: ActionData;
+		data: PageData;
+	};
 
 	let { form }: PageProps = $props();
 
-	let artist = $state<string>('');
-	let book = $state<string>('');
-	let film = $state<string>('');
+	let selectedPlace = $state<string>('');
 	let loading = $state<boolean>(false);
+	let priceRangeValue = $state<string>(''); // State for price range select
+
+	const priceOptions = [
+		{ value: '1', label: '$ (Inexpensive)' },
+		{ value: '2', label: '$$ (Moderate)' },
+		{ value: '3', label: '$$$ (Expensive)' },
+		{ value: '4', label: '$$$$ (Very Expensive)' }
+	];
+
+	const priceTriggerContent = $derived(
+		priceOptions.find((p) => p.value === priceRangeValue)?.label ?? 'Select a price range'
+	);
 </script>
 
 <form
@@ -36,28 +67,46 @@
 >
 	<Card class="mx-auto mt-10 w-[450px]">
 		<CardHeader>
-			<CardTitle>Welcome to FlavorJourney!</CardTitle>
+			<CardTitle>Find Your Next Flavor</CardTitle>
 			<CardDescription
-				>Tell us what you love! Your preferences help us understand your unique taste.</CardDescription
+				>Tell us your tastes and we'll find the perfect place for you.</CardDescription
 			>
 		</CardHeader>
 		<CardContent>
 			<div class="grid w-full items-center gap-4">
 				<div class="flex flex-col space-y-1.5">
-					<label for="musicArtist">Favorite Music Artist</label>
-					<Input id="musicArtist" name="musicArtist" placeholder="e.g., Beyonce" />
+					<Label for="cuisines">Favorite Cuisines</Label>
+					<Input id="cuisines" name="cuisines" placeholder="e.g., Italian, Mexican, Japanese" />
 				</div>
 				<div class="flex flex-col space-y-1.5">
-					<label for="bookTitle">Favorite Book Title</label>
+					<Label for="placeTypes">Types of Places</Label>
+					<Input id="placeTypes" name="placeTypes" placeholder="e.g., Restaurant, Cafe, Bar" />
+				</div>
+				<div class="flex flex-col space-y-1.5">
+					<Label for="priceRange">Price Range</Label>
+					<Select.Root type="single" name="priceRange" bind:value={priceRangeValue}>
+						<Select.Trigger id="priceRange" class="w-full">
+							{priceTriggerContent}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Group>
+								<Select.Label>Price</Select.Label>
+								{#each priceOptions as option (option.value)}
+									<Select.Item value={option.value} label={option.label}>
+										{option.label}
+									</Select.Item>
+								{/each}
+							</Select.Group>
+						</Select.Content>
+					</Select.Root>
+				</div>
+				<div class="flex flex-col space-y-1.5">
+					<Label for="favoritePlaces">Favorite Places (Optional)</Label>
 					<Input
-						id="bookTitle"
-						name="bookTitle"
-						placeholder="e.g., The Hitchhiker's Guide to the Galaxy"
+						id="favoritePlaces"
+						name="favoritePlaces"
+						placeholder="e.g., The French Laundry, Noma"
 					/>
-				</div>
-				<div class="flex flex-col space-y-1.5">
-					<label for="filmTitle">Favorite Film Title</label>
-					<Input id="filmTitle" name="filmTitle" placeholder="e.g., Inception" />
 				</div>
 			</div>
 			{#if form?.qlooEntityIds && Object.keys(form.qlooEntityIds).length > 0}
@@ -65,205 +114,109 @@
 				{#each Object.entries(form.qlooEntityIds) as [key, results] (key)}
 					{#if results && results.length > 0}
 						<div class="mb-4">
-							<h3 class="text-lg font-semibold capitalize">
-								Select {key.replace('Title', '').replace('Artist', '')}
-							</h3>
-							{#if key === 'musicArtist'}
-								<RadioGroup name={key} class="grid grid-cols-1 gap-2" bind:value={artist}>
-									{#each results as result (result.entity_id)}
-										<div class="flex items-start space-x-4 rounded-md border p-4">
-											<RadioGroupItem value={result.entity_id} id={result.entity_id} class="mt-1" />
-											{#if result.properties?.image?.url}
-												<img
-													src={result.properties.image.url}
-													alt="Image of {result.name}"
-													class="h-24 w-24 rounded-md object-cover"
-												/>
+							<h3 class="text-lg font-semibold capitalize">Select a matching place</h3>
+							<RadioGroup
+								name="selectedPlace"
+								class="grid grid-cols-1 gap-2"
+								bind:value={selectedPlace}
+							>
+								{#each results as result (result.entity_id)}
+									<div class="flex items-start space-x-4 rounded-md border p-4">
+										<RadioGroupItem value={result.entity_id} id={result.entity_id} class="mt-1" />
+										{#if result.properties?.image?.url}
+											<img
+												src={result.properties.image.url}
+												alt="Image of {result.name}"
+												class="h-24 w-24 rounded-md object-cover"
+											/>
+										{/if}
+										<div class="flex flex-col">
+											<Label for={result.entity_id} class="text-base font-semibold"
+												>{result.name}</Label
+											>
+											{#if result.properties?.short_description}
+												<p class="text-sm text-muted-foreground">
+													{result.properties.short_description}
+												</p>
 											{/if}
-											<div class="flex flex-col">
-												<Label for={result.entity_id} class="text-base font-semibold"
-													>{result.name}</Label
-												>
-												{#if result.properties?.short_description}
-													<p class="text-sm text-muted-foreground">
-														{result.properties.short_description}
-													</p>
-												{/if}
-												{#if result.disambiguation}
-													<span class="text-sm text-muted-foreground">{result.disambiguation}</span>
-												{/if}
-												{#if result.types && result.types.length > 0}
-													<span class="text-xs text-muted-foreground"
-														>Types: {result.types.join(', ').replace(/urn:entity:/g, '')}</span
-													>
-												{/if}
-												{#if result.properties?.date_of_birth}
-													<span class="text-xs text-muted-foreground"
-														>Born: {result.properties.date_of_birth}</span
-													>
-												{/if}
-												{#if result.properties?.place_of_birth}
-													<span class="text-xs text-muted-foreground"
-														>Place of Birth: {result.properties.place_of_birth}</span
-													>
-												{/if}
-												{#if result.tags && result.tags.length > 0}
-													<div class="mt-2">
-														<h4 class="text-xs font-semibold">Tags</h4>
-														<div class="flex flex-wrap gap-1">
-															{#each result.tags.slice(0, 5) as tag (tag.tag_id)}
-																<span
-																	class="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
-																>
-																	{tag.name}
-																</span>
-															{/each}
-														</div>
-													</div>
-												{/if}
-											</div>
-										</div>
-									{/each}
-								</RadioGroup>
-							{:else if key === 'bookTitle'}
-								<RadioGroup name={key} class="grid grid-cols-1 gap-2" bind:value={book}>
-									{#each results as result (result.entity_id)}
-										<div class="flex items-start space-x-4 rounded-md border p-4">
-											<RadioGroupItem value={result.entity_id} id={result.entity_id} class="mt-1" />
-											{#if result.properties?.image?.url}
-												<img
-													src={result.properties.image.url}
-													alt="Image of {result.name}"
-													class="h-24 w-24 rounded-md object-cover"
-												/>
+											{#if result.disambiguation}
+												<span class="text-sm text-muted-foreground">{result.disambiguation}</span>
 											{/if}
-											<div class="flex flex-col">
-												<Label for={result.entity_id} class="text-base font-semibold"
-													>{result.name}</Label
-												>
-												{#if result.properties?.short_description}
-													<p class="text-sm text-muted-foreground">
-														{result.properties.short_description}
-													</p>
-												{/if}
-												{#if result.disambiguation}
-													<span class="text-sm text-muted-foreground">{result.disambiguation}</span>
-												{/if}
-												{#if result.types && result.types.length > 0}
-													<span class="text-xs text-muted-foreground"
-														>Types: {result.types.join(', ').replace(/urn:entity:/g, '')}</span
-													>
-												{/if}
-												{#if result.properties?.date_of_birth}
-													<span class="text-xs text-muted-foreground"
-														>Born: {result.properties.date_of_birth}</span
-													>
-												{/if}
-												{#if result.properties?.place_of_birth}
-													<span class="text-xs text-muted-foreground"
-														>Place of Birth: {result.properties.place_of_birth}</span
-													>
-												{/if}
-												{#if result.tags && result.tags.length > 0}
-													<div class="mt-2">
-														<h4 class="text-xs font-semibold">Tags</h4>
-														<div class="flex flex-wrap gap-1">
-															{#each result.tags.slice(0, 5) as tag (tag.tag_id)}
-																<span
-																	class="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
-																>
-																	{tag.name}
-																</span>
-															{/each}
-														</div>
-													</div>
-												{/if}
-											</div>
 										</div>
-									{/each}
-								</RadioGroup>
-							{:else if key === 'filmTitle'}
-								<RadioGroup name={key} class="grid grid-cols-1 gap-2" bind:value={film}>
-									{#each results as result (result.entity_id)}
-										<div class="flex items-start space-x-4 rounded-md border p-4">
-											<RadioGroupItem value={result.entity_id} id={result.entity_id} class="mt-1" />
-											{#if result.properties?.image?.url}
-												<img
-													src={result.properties.image.url}
-													alt="Image of {result.name}"
-													class="h-24 w-24 rounded-md object-cover"
-												/>
-											{/if}
-											<div class="flex flex-col">
-												<Label for={result.entity_id} class="text-base font-semibold"
-													>{result.name}</Label
-												>
-												{#if result.properties?.short_description}
-													<p class="text-sm text-muted-foreground">
-														{result.properties.short_description}
-													</p>
-												{/if}
-												{#if result.disambiguation}
-													<span class="text-sm text-muted-foreground">{result.disambiguation}</span>
-												{/if}
-												{#if result.types && result.types.length > 0}
-													<span class="text-xs text-muted-foreground"
-														>Types: {result.types.join(', ').replace(/urn:entity:/g, '')}</span
-													>
-												{/if}
-												{#if result.properties?.date_of_birth}
-													<span class="text-xs text-muted-foreground"
-														>Born: {result.properties.date_of_birth}</span
-													>
-												{/if}
-												{#if result.properties?.place_of_birth}
-													<span class="text-xs text-muted-foreground"
-														>Place of Birth: {result.properties.place_of_birth}</span
-													>
-												{/if}
-												{#if result.tags && result.tags.length > 0}
-													<div class="mt-2">
-														<h4 class="text-xs font-semibold">Tags</h4>
-														<div class="flex flex-wrap gap-1">
-															{#each result.tags.slice(0, 5) as tag (tag.tag_id)}
-																<span
-																	class="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
-																>
-																	{tag.name}
-																</span>
-															{/each}
-														</div>
-													</div>
-												{/if}
-											</div>
-										</div>
-									{/each}
-								</RadioGroup>
-							{/if}
+									</div>
+								{/each}
+							</RadioGroup>
 						</div>
 					{/if}
 				{/each}
 			{/if}
 
 			<!-- Hidden inputs to send selected values -->
-			{#if artist}
-				<input type="hidden" name="selectedMusicArtist" value={artist} />
+			{#if selectedPlace}
+				<input type="hidden" name="selectedPlace" value={selectedPlace} />
 			{/if}
-			{#if book}
-				<input type="hidden" name="selectedBookTitle" value={book} />
+			{#if form?.qlooTagIds}
+				<input type="hidden" name="allQlooTagIds" value={JSON.stringify(form.qlooTagIds)} />
 			{/if}
-			{#if film}
-				<input type="hidden" name="selectedFilmTitle" value={film} />
+			{#if form?.priceRange}
+				<input type="hidden" name="priceRange" value={form.priceRange} />
+			{/if}
+			{#if form?.message}
+				<p class="text-red-500">{form.message}</p>
 			{/if}
 		</CardContent>
 		<CardFooter class="mt-2 flex justify-end">
 			{#if form?.qlooEntityIds && Object.keys(form.qlooEntityIds).length > 0}
 				<Button type="submit" formaction="?/submit">Finalize Preferences</Button>
 			{:else if loading}
-				<Button disabled>Submitting Preferences...</Button>
+				<Button disabled>Finding Places...</Button>
 			{:else}
-				<Button type="submit">Submit Preferences</Button>
+				<Button type="submit">Find Places</Button>
 			{/if}
 		</CardFooter>
 	</Card>
 </form>
+
+{#if form?.insights?.success && form.insights.results.entities.length > 0}
+	<h2 class="mt-10 text-2xl font-bold">Recommended Places:</h2>
+	<div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+		{#each form.insights.results.entities as entity (entity.entity_id)}
+			<Card>
+				<CardHeader>
+					<CardTitle>{entity.name}</CardTitle>
+					<CardDescription
+						>{entity.properties?.description || 'No description available.'}</CardDescription
+					>
+				</CardHeader>
+				<CardContent>
+					<p><strong>Address:</strong> {entity.properties?.address || 'N/A'}</p>
+					<p><strong>Business Rating:</strong> {entity.properties?.business_rating || 'N/A'}</p>
+					<p><strong>Neighborhood:</strong> {entity.properties?.neighborhood || 'N/A'}</p>
+					{#if entity.properties?.keywords && entity.properties.keywords.length > 0}
+						<p>
+							<strong>Keywords:</strong>
+							{entity.properties.keywords.map((k) => k.name).join(', ')}
+						</p>
+					{/if}
+					{#if entity.properties?.specialty_dishes && entity.properties.specialty_dishes.length > 0}
+						<p>
+							<strong>Specialty Dishes:</strong>
+							{entity.properties.specialty_dishes.map((d) => d.name).join(', ')}
+						</p>
+					{/if}
+				</CardContent>
+				<CardFooter>
+					{#if entity.properties?.website}
+						<a
+							href={entity.properties.website}
+							target="_blank"
+							class="text-blue-500 hover:underline">Website</a
+						>
+					{/if}
+				</CardFooter>
+			</Card>
+		{/each}
+	</div>
+{:else if form?.insights?.success === false}
+	<p class="mt-4 text-red-500">No recommendations found or an error occurred: {form.message}</p>
+{/if}
