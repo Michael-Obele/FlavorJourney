@@ -51,6 +51,35 @@
 	const priceTriggerContent = $derived(
 		priceOptions.find((p) => p.value === priceRangeValue)?.label ?? 'Select a price range'
 	);
+
+	let selectedCuisine = $state<string>('');
+	let selectedPlaceType = $state<string>('');
+
+	const cuisineOptions = [
+		{ value: 'italian', label: 'Italian' },
+		{ value: 'french', label: 'French' },
+		{ value: 'mexican', label: 'Mexican' },
+		{ value: 'chinese', label: 'Chinese' },
+		{ value: 'indian', label: 'Indian' },
+		{ value: 'japanese', label: 'Japanese' },
+		{ value: 'mediterranean', label: 'Mediterranean' },
+		{ value: 'thai', label: 'Thai' },
+		{ value: 'american', label: 'American' }
+	];
+
+	const placeTypeOptions = [
+		{ value: 'restaurant', label: 'Restaurant' },
+		{ value: 'cafe', label: 'Cafe' },
+		{ value: 'bar', label: 'Bar' }
+	];
+
+	const cuisineTriggerContent = $derived(
+		cuisineOptions.find((c) => c.value === selectedCuisine)?.label ?? 'Select a cuisine'
+	);
+
+	const placeTypeTriggerContent = $derived(
+		placeTypeOptions.find((p) => p.value === selectedPlaceType)?.label ?? 'Select a place type'
+	);
 </script>
 
 <form
@@ -76,11 +105,39 @@
 			<div class="grid w-full items-center gap-4">
 				<div class="flex flex-col space-y-1.5">
 					<Label for="cuisines">Favorite Cuisines</Label>
-					<Input id="cuisines" name="cuisines" placeholder="e.g., Italian, Mexican, Japanese" />
+					<Select.Root type="single" name="cuisines" bind:value={selectedCuisine}>
+						<Select.Trigger id="cuisines" class="w-full">
+							{cuisineTriggerContent}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Group>
+								<Select.Label>Cuisines</Select.Label>
+								{#each cuisineOptions as option (option.value)}
+									<Select.Item value={option.value} label={option.label}>
+										{option.label}
+									</Select.Item>
+								{/each}
+							</Select.Group>
+						</Select.Content>
+					</Select.Root>
 				</div>
 				<div class="flex flex-col space-y-1.5">
 					<Label for="placeTypes">Types of Places</Label>
-					<Input id="placeTypes" name="placeTypes" placeholder="e.g., Restaurant, Cafe, Bar" />
+					<Select.Root type="single" name="placeTypes" bind:value={selectedPlaceType}>
+						<Select.Trigger id="placeTypes" class="w-full">
+							{placeTypeTriggerContent}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Group>
+								<Select.Label>Place Types</Select.Label>
+								{#each placeTypeOptions as option (option.value)}
+									<Select.Item value={option.value} label={option.label}>
+										{option.label}
+									</Select.Item>
+								{/each}
+							</Select.Group>
+						</Select.Content>
+					</Select.Root>
 				</div>
 				<div class="flex flex-col space-y-1.5">
 					<Label for="priceRange">Price Range</Label>

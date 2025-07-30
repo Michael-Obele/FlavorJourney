@@ -140,61 +140,49 @@ export const actions: Actions = {
 			headers: { accept: 'application/json', 'X-Api-Key': `${qlooApiKey}` }
 		};
 
-		// Fetch tag IDs for cuisines
+		const tagMapping: Record<string, string> = {
+			italian: 'urn:tag:cuisine:italian',
+			french: 'urn:tag:cuisine:french',
+			mexican: 'urn:tag:cuisine:mexican',
+			chinese: 'urn:tag:cuisine:chinese',
+			indian: 'urn:tag:cuisine:indian',
+			japanese: 'urn:tag:cuisine:japanese',
+			mediterranean: 'urn:tag:cuisine:mediterranean',
+			thai: 'urn:tag:cuisine:thai',
+			american: 'urn:tag:cuisine:american',
+			cafe: 'urn:tag:venue_type:cafe',
+			bar: 'urn:tag:venue_type:bar',
+			restaurant: 'urn:tag:venue_type:restaurant'
+			// Add more mappings as needed
+		};
+
+		// Process cuisines
 		if (cuisines) {
-			const cuisineArray = cuisines.split(',').map((s) => s.trim());
+			const cuisineArray = cuisines.split(',').map((s) => s.trim().toLowerCase());
 			for (const cuisine of cuisineArray) {
-				console.log(`Searching Qloo for cuisine tag: "${cuisine}"`);
-				try {
-					const response = await fetch(
-						`${qlooApiUrl}v2/tags?q=${encodeURIComponent(cuisine)}`,
-						options
-					);
-					if (response.status === 200) {
-						const result = await response.json();
-						if (result.results && result.results.length > 0) {
-							qlooTagIds[cuisine] = result.results;
-						} else {
-							qlooTagIds[cuisine] = null;
-						}
-					} else {
-						console.error(
-							`Error searching Qloo for cuisine ${cuisine}: ${response.status} ${response.statusText}`
-						);
-						qlooTagIds[cuisine] = null;
-					}
-				} catch (error) {
-					console.error(`Exception searching Qloo for cuisine ${cuisine}:`, error);
+				const tagUrn = tagMapping[cuisine];
+				if (tagUrn) {
+					qlooTagIds[cuisine] = [
+						{ name: cuisine, tag_id: tagUrn, type: 'cuisine', value: cuisine }
+					];
+					console.log(`Mapped cuisine "${cuisine}" to URN: "${tagUrn}"`);
+				} else {
+					console.warn(`No URN mapping found for cuisine: "${cuisine}"`);
 					qlooTagIds[cuisine] = null;
 				}
 			}
 		}
 
-		// Fetch tag IDs for place types
+		// Process place types
 		if (placeTypes) {
-			const placeTypeArray = placeTypes.split(',').map((s) => s.trim());
+			const placeTypeArray = placeTypes.split(',').map((s) => s.trim().toLowerCase());
 			for (const type of placeTypeArray) {
-				console.log(`Searching Qloo for place type tag: "${type}"`);
-				try {
-					const response = await fetch(
-						`${qlooApiUrl}v2/tags?q=${encodeURIComponent(type)}`,
-						options
-					);
-					if (response.status === 200) {
-						const result = await response.json();
-						if (result.results && result.results.length > 0) {
-							qlooTagIds[type] = result.results;
-						} else {
-							qlooTagIds[type] = null;
-						}
-					} else {
-						console.error(
-							`Error searching Qloo for place type ${type}: ${response.status} ${response.statusText}`
-						);
-						qlooTagIds[type] = null;
-					}
-				} catch (error) {
-					console.error(`Exception searching Qloo for place type ${type}:`, error);
+				const tagUrn = tagMapping[type];
+				if (tagUrn) {
+					qlooTagIds[type] = [{ name: type, tag_id: tagUrn, type: 'venue_type', value: type }];
+					console.log(`Mapped place type "${type}" to URN: "${tagUrn}"`);
+				} else {
+					console.warn(`No URN mapping found for place type: "${type}"`);
 					qlooTagIds[type] = null;
 				}
 			}

@@ -392,3 +392,16 @@ This table summarizes the supported signals and filters for each entity type.
 - [Hackathon Sign-Up](https://qloo-hackathon.devpost.com/)
 - [Qloo API Documentation](https://docs.qloo.com/reference/api-overview#/)
 - [#qloo-hackathon Discord Channel](https://discord.com/channels/1367906548264992768/1367906751969497159) for help.
+
+### Constructing Tag URNs
+
+The Qloo API requires full URNs (Uniform Resource Names) for tags, not simple user-input strings. This was identified through recent test results where using simple strings resulted in a `400 Bad Request` error. A successful call used specific URNs, confirming this requirement.
+
+The likely structure for a Qloo tag URN is `urn:tag:<category>:<name>`.
+
+**Examples of valid tag URNs:**
+
+- Cuisine: `urn:tag:cuisine:italian`
+- Accessibility: `urn:tag:accessibility:place:wheelchair_accessible_entrance`
+- Offerings: `urn:tag:offerings:place:vegan_options`
+- Dining Options: `urn:tag:dining_options:place:brunch`

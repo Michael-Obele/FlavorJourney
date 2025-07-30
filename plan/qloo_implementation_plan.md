@@ -13,9 +13,13 @@ The first step is to understand the user's tastes. We will collect the following
 
 These preferences will be mapped to Qloo API concepts:
 
-- **Cuisines and Place Types** will be translated into Qloo `tags`. We will use the `/v2/tags` endpoint to search for the corresponding tag IDs.
+- **Cuisines and Place Types** will be translated into Qloo `tags`. We will use a hardcoded mapping to link user-friendly selections to their corresponding full Qloo tag URNs.
 - **Price Range** will be mapped directly to the `filter.price_level.min` and `filter.price_level.max` parameters in the `/v2/insights` endpoint.
 - **Favorite Places** will be used to find initial entity IDs using the `/search` endpoint.
+
+### Tag Mapping Strategy
+
+To ensure valid tags are always sent to the Qloo API, we will implement a hardcoded mapping within our application. This mapping will link user-friendly options (e.g., "Italian", "Cafe", "Brunch") to their corresponding full Qloo tag URNs (e.g., `urn:tag:cuisine:italian`, `urn:tag:place_type:cafe`, `urn:tag:dining_options:place:brunch`). This strategy avoids `400 Bad Request` errors caused by using simple strings as tags.
 
 ## 2. Qloo API Interaction Flow
 
@@ -25,11 +29,9 @@ The interaction with the Qloo API will follow a two-step process:
 
 Before we can get recommendations, we need to gather initial "signals" based on the user's preferences.
 
-1.  **Get Tag IDs:** For each cuisine and place type selected by the user, we will call the `/v2/tags` endpoint with a search query.
-    - **Endpoint:** `GET /v2/tags`
-    - **Parameters:** `q={cuisine_or_place_type}`
-    - **Example:** `GET /v2/tags?q=italian`
-    - We will store the returned tag IDs.
+1.  **Look Up Tag URNs:** For each cuisine and place type selected by the user, we will look up the corresponding full Qloo tag URN from our internal, hardcoded map.
+    - **Example:** If the user selects "Italian", the application will retrieve `urn:tag:cuisine:italian` from the map.
+    - We will store these retrieved tag URNs.
 
 2.  **Get Entity IDs (Optional):** If the user provided favorite places, we will use the `/search` endpoint to find their Qloo entity IDs.
     - **Endpoint:** `GET /search`
