@@ -48,10 +48,11 @@ With the signal IDs, we can now query the `/v2/insights` endpoint to get persona
   - `filter.type=urn:entity:place` (Required to get place recommendations)
   - `signal.interests.tags={tag_ids}` (Comma-separated list of tag IDs from Step 2.1)
   - `signal.interests.entities={entity_ids}` (Comma-separated list of entity IDs from Step 2.1)
-  - `filter.location={latitude},{longitude}` (User's current location)
+  - `filter.location.query={latitude},{longitude}` (User's current location)
   - `filter.location.radius=8050` (Approximately 5 miles)
   - `filter.price_level.min={min_price}` and `filter.price_level.max={max_price}` (Based on user's preference)
   - `take=10` (To get the top 10 recommendations)
+  - `operator.filter.tags=intersection` (To ensure all specified tags are present)
 
 ## 3. LLM Integration for Food Suggestions
 

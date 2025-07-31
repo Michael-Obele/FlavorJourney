@@ -159,6 +159,23 @@ curl --request GET \
      --header 'x-api-key: YOUR_HACKATHON_API_KEY'
 ```
 
+#### Example with Multiple Tags and Location Query
+
+```javascript
+const options = {
+	method: 'GET',
+	headers: { 'X-Api-Key': '<<apiKey>>' }
+};
+
+fetch(
+	'https://api.qloo.com/v2/insights/?filter.type=urn:entity:place&filter.location.query=40.7831° N, 73.9712° W&filter.tags=urn:tag:accessibility:place:wheelchair_accessible_entrance, urn:tag:offerings:place:vegan_options,urn:tag:dining_options:place:brunch&operator.filter.tags=intersection',
+	options
+)
+	.then((response) => response.json())
+	.then((result) => console.log(result))
+	.catch((error) => console.error(error));
+```
+
 ---
 
 ## 4. Supporting API Endpoints
