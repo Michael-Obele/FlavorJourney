@@ -58,6 +58,7 @@
 		"@prisma/client": "^6.12.0",
 		"arctic": "^3.7.0",
 		"argon2": "^0.43.1",
-		"mode-watcher": "^1.1.0"
+		"mode-watcher": "^1.1.0",
+		"runed": "^0.31.1"
 	}
 }

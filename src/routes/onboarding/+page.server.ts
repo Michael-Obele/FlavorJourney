@@ -1,5 +1,6 @@
 import type { Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
+import { URLSearchParams } from 'url';
 import { env } from '$env/dynamic/private';
 
 export interface Tag {
@@ -56,7 +57,7 @@ interface Properties {
 	date_of_birth?: string;
 	external?: ExternalIds;
 	gender?: string;
-	image?: Image;
+	image?: Image | null;
 	instrument?: string;
 	links?: object;
 	official_site?: string;
@@ -67,14 +68,14 @@ interface Properties {
 	unmarried_partner?: string;
 	akas?: { language: string; value: string }[];
 	content_rating?: string;
-	description?: string;
+	description?: string | null;
 	filming_location?: string;
 	is_special?: boolean;
 	production_company?: string;
 	release_country?: string;
 	release_date?: string;
 	release_year?: number;
-	website?: string;
+	website?: string | null;
 	duration?: { album?: number };
 	track_count?: number;
 	format?: string;
@@ -83,15 +84,16 @@ interface Properties {
 	page_count?: number;
 	publication_date?: string;
 	publication_year?: number;
-	address?: string;
-	business_rating?: number;
+	address?: string | null;
+	business_rating?: number | null;
 	geocode?: object;
 	hours?: object;
 	is_closed?: boolean;
 	neighborhood?: string;
-	phone?: string;
+	phone?: string | null;
 	keywords?: Keyword[]; // Add keywords to Properties
 	specialty_dishes?: SpecialtyDish[]; // Add specialty_dishes to Properties
+	price_level?: number | null; // Add price_level to Properties
 }
 
 export interface QlooEntity {
@@ -107,16 +109,181 @@ export interface QlooEntity {
 	subtype?: string;
 }
 
-export const actions: Actions = {
-	search: async ({ request }) => {
-		console.log('Action: search - initiated');
-		const data = await request.formData();
-		const cuisines = data.get('cuisines')?.toString();
-		const placeTypes = data.get('placeTypes')?.toString();
-		const priceRange = data.get('priceRange')?.toString();
-		const favoritePlaces = data.get('favoritePlaces')?.toString();
+interface VerboseTag {
+	name: string;
+	type: string;
+	tag_id?: string;
+	value?: string;
+}
 
-		console.log('Form data:', { cuisines, placeTypes, priceRange, favoritePlaces });
+interface VerboseProperties {
+	description: string | null;
+	keywords: { name: string; count: number }[];
+	specialty_dishes: { id: string; name: string; type: string; weight: number }[];
+	address: string | null;
+	phone: string | null;
+	website: string | null;
+	image: string | null;
+	business_rating: number | null;
+	price_level: number | null;
+}
+
+interface VerboseEntity {
+	name: string;
+	entity_id: string;
+	popularity: number | null;
+	types: string[];
+	disambiguation: string | null;
+	location: Location | null;
+	properties: VerboseProperties;
+	tags: VerboseTag[];
+}
+
+// Helper function to build Qloo Insights API URL
+function buildQlooInsightsUrl(
+	qlooApiUrl: string,
+	entityId: string,
+	locationQuery?: string,
+	filterTags?: string[],
+	operatorFilterTags?: 'union' | 'intersection',
+	filterRadius?: string,
+	priceRange?: string
+): string {
+	let insightsUrl = `${qlooApiUrl}v2/insights/?filter.type=urn:entity:place`;
+	insightsUrl += `&signal.interests.entities=${encodeURIComponent(entityId)}`;
+
+	if (locationQuery) {
+		insightsUrl += `&filter.location.query=${encodeURIComponent(locationQuery)}`;
+	}
+
+	if (filterTags && filterTags.length > 0) {
+		insightsUrl += `&filter.tags=${encodeURIComponent(filterTags.join(','))}`;
+		if (operatorFilterTags) {
+			insightsUrl += `&operator.filter.tags=${encodeURIComponent(operatorFilterTags)}`;
+		}
+	}
+
+	if (filterRadius) {
+		insightsUrl += `&filter.location.radius=${encodeURIComponent(filterRadius)}`;
+	}
+
+	if (priceRange) {
+		insightsUrl += `&filter.price_level.min=${priceRange}&filter.price_level.max=${priceRange}`;
+	}
+
+	return insightsUrl;
+}
+
+// Helper function to process Qloo entities into verbose format
+function processQlooEntities(entities: QlooEntity[]): VerboseEntity[] {
+	return entities.map((e) => ({
+		name: e.name,
+		entity_id: e.entity_id,
+		popularity: e.popularity ?? null,
+		types: e.types,
+		disambiguation: e.disambiguation ?? null,
+		location: e.location ?? null,
+		properties: {
+			description: e.properties?.description ?? null,
+			keywords: e.properties?.keywords?.map((k) => ({ name: k.name, count: k.count })) ?? [],
+			specialty_dishes:
+				e.properties?.specialty_dishes?.map((d) => ({
+					id: d.id,
+					name: d.name,
+					type: d.type,
+					weight: d.weight
+				})) ?? [],
+			address: e.properties?.address ?? null,
+			phone: e.properties?.phone ?? null,
+			website: e.properties?.website ?? e.properties?.official_site ?? null,
+			image: e.properties?.image?.url ?? null,
+			business_rating: e.properties?.business_rating ?? null,
+			price_level: e.properties?.price_level ?? null
+		},
+		tags:
+			e.tags?.map((t) => ({
+				name: t.name,
+				type: t.type,
+				tag_id: (t as any).tag_id,
+				value: (t as any).value
+			})) ?? []
+	}));
+}
+
+export const actions: Actions = {
+	getEntityId: async ({ request, cookies }) => {
+		console.log('Action: getEntityId - initiated');
+		const data = await request.formData();
+		const searchTerm = data.get('searchTerm')?.toString();
+
+		if (!searchTerm) {
+			return fail(400, { success: false, message: 'Search term is required.' });
+		}
+
+		const qlooApiKey = env.QLOO_API_KEY;
+		const qlooApiUrl = env.QLOO_API_URL;
+
+		if (!qlooApiKey || !qlooApiUrl) {
+			console.error('Qloo API key or URL is not set in environment variables.');
+			return fail(500, { success: false, message: 'Server configuration error.' });
+		}
+
+		const options = {
+			method: 'GET',
+			headers: { accept: 'application/json', 'X-Api-Key': `${qlooApiKey}` }
+		};
+
+		const searchParams = new URLSearchParams({
+			query: searchTerm
+		});
+
+		const searchUrl = `${qlooApiUrl}search?${searchParams.toString()}`;
+		console.log('Qloo Search URL:', searchUrl);
+
+		try {
+			const response = await fetch(searchUrl, options);
+			console.log(`Qloo Search API Response Status: ${response.status} ${response.statusText}`);
+
+			if (response.status === 200) {
+				type QlooSearchResponse = { results: QlooEntity[] };
+				const searchResult: QlooSearchResponse = await response.json();
+				console.log('Full Qloo Search API Response:', searchResult);
+
+				const mostPopularEntity = searchResult.results[0];
+				if (!mostPopularEntity) {
+					console.warn('Qloo Search API returned no results for query.');
+					return fail(404, { success: false, message: 'No matching entities found.' });
+				}
+
+				cookies.set('entityId', mostPopularEntity.entity_id, { path: '/' });
+				return {
+					success: true,
+					entityId: mostPopularEntity.entity_id,
+					entityName: mostPopularEntity.name
+				};
+			} else {
+				console.error(`Error fetching Qloo search: ${response.status} ${response.statusText}`);
+				return fail(500, { success: false, message: 'Failed to fetch Qloo search results.' });
+			}
+		} catch (error) {
+			console.error('Exception fetching Qloo search:', error);
+			return fail(500, { success: false, message: 'Failed to fetch Qloo search results.' });
+		}
+	},
+	search: async ({ request, cookies }) => {
+		console.log('Action: search - initiated (dynamic)');
+
+		const entityId = cookies.get('entityId');
+		if (!entityId) {
+			console.warn('Missing entityId cookie. Prompt user to fetch it first via getEntityId.');
+			return fail(400, {
+				success: false,
+				qlooEntityIds: {},
+				qlooTagIds: {},
+				priceRange: undefined,
+				message: 'Missing entityId. Please fetch an Entity ID first.'
+			});
+		}
 
 		const qlooApiKey = env.QLOO_API_KEY;
 		const qlooApiUrl = env.QLOO_API_URL;
@@ -133,115 +300,26 @@ export const actions: Actions = {
 		}
 		console.log('Qloo API environment variables loaded.');
 
-		const qlooEntityIds: Record<string, QlooEntity[] | null> = {};
-		const qlooTagIds: Record<string, Tag[] | null> = {};
-		const options = {
-			method: 'GET',
-			headers: { accept: 'application/json', 'X-Api-Key': `${qlooApiKey}` }
-		};
+		let locationQuery: string | undefined;
+		let operatorFilterTags: 'union' | 'intersection' | undefined;
+		let filterRadius: string | undefined;
+		let filterTags: string[] = [];
+		let priceRange: string | undefined;
 
-		const tagMapping: Record<string, string> = {
-			italian: 'urn:tag:cuisine:italian',
-			french: 'urn:tag:cuisine:french',
-			mexican: 'urn:tag:cuisine:mexican',
-			chinese: 'urn:tag:cuisine:chinese',
-			indian: 'urn:tag:cuisine:indian',
-			japanese: 'urn:tag:cuisine:japanese',
-			mediterranean: 'urn:tag:cuisine:mediterranean',
-			thai: 'urn:tag:cuisine:thai',
-			american: 'urn:tag:cuisine:american',
-			cafe: 'urn:tag:venue_type:cafe',
-			bar: 'urn:tag:venue_type:bar',
-			restaurant: 'urn:tag:venue_type:restaurant'
-			// Add more mappings as needed
-		};
+		try {
+			const data = await request.formData();
+			locationQuery = data.get('locationQuery')?.toString() || undefined;
+			priceRange = data.get('priceRange')?.toString() || undefined;
 
-		// Process cuisines
-		if (cuisines) {
-			const cuisineArray = cuisines.split(',').map((s) => s.trim().toLowerCase());
-			for (const cuisine of cuisineArray) {
-				const tagUrn = tagMapping[cuisine];
-				if (tagUrn) {
-					qlooTagIds[cuisine] = [
-						{ name: cuisine, tag_id: tagUrn, type: 'cuisine', value: cuisine }
-					];
-					console.log(`Mapped cuisine "${cuisine}" to URN: "${tagUrn}"`);
-				} else {
-					console.warn(`No URN mapping found for cuisine: "${cuisine}"`);
-					qlooTagIds[cuisine] = null;
-				}
-			}
-		}
+			const rawTags = data.getAll('filterTags[]').map((v) => v.toString());
+			filterTags = rawTags.filter((t) => t && t.startsWith('urn:tag:'));
 
-		// Process place types
-		if (placeTypes) {
-			const placeTypeArray = placeTypes.split(',').map((s) => s.trim().toLowerCase());
-			for (const type of placeTypeArray) {
-				const tagUrn = tagMapping[type];
-				if (tagUrn) {
-					qlooTagIds[type] = [{ name: type, tag_id: tagUrn, type: 'venue_type', value: type }];
-					console.log(`Mapped place type "${type}" to URN: "${tagUrn}"`);
-				} else {
-					console.warn(`No URN mapping found for place type: "${type}"`);
-					qlooTagIds[type] = null;
-				}
-			}
-		}
+			operatorFilterTags =
+				(data.get('operatorFilterTags')?.toString() as 'union' | 'intersection') || 'intersection';
 
-		// Fetch entity IDs for favorite places
-		if (favoritePlaces) {
-			const favoritePlaceArray = favoritePlaces.split(',').map((s) => s.trim());
-			for (const place of favoritePlaceArray) {
-				console.log(`Searching Qloo for favorite place: "${place}"`);
-				try {
-					const response = await fetch(
-						`${qlooApiUrl}search?q=${encodeURIComponent(place)}&types=place`,
-						options
-					);
-					if (response.status === 200) {
-						const result = await response.json();
-						if (result.results && result.results.length > 0) {
-							qlooEntityIds[place] = result.results;
-						} else {
-							qlooEntityIds[place] = null;
-						}
-					} else {
-						console.error(
-							`Error searching Qloo for favorite place ${place}: ${response.status} ${response.statusText}`
-						);
-						qlooEntityIds[place] = null;
-					}
-				} catch (error) {
-					console.error(`Exception searching Qloo for favorite place ${place}:`, error);
-					qlooEntityIds[place] = null;
-				}
-			}
-		}
-
-		console.log('Final Processed Qloo Entity IDs:', qlooEntityIds);
-		console.log('Final Processed Qloo Tag IDs:', qlooTagIds);
-
-		return { success: true, qlooEntityIds, qlooTagIds, priceRange, message: undefined }; // Ensure message is always present
-	},
-	submit: async ({ request, cookies }) => {
-		console.log('Action: submit - initiated');
-		const data = await request.formData();
-		const selectedPlace = data.get('selectedPlace')?.toString();
-		const allQlooTagIds = JSON.parse(data.get('allQlooTagIds')?.toString() || '{}');
-		const priceRange = data.get('priceRange')?.toString();
-		const cuisines = data.get('cuisines')?.toString(); // Retrieve cuisines from form data
-
-		console.log('Selected Place:', selectedPlace);
-		console.log('All Qloo Tag IDs:', allQlooTagIds);
-		console.log('Price Range:', priceRange);
-		console.log('Cuisines:', cuisines);
-
-		const qlooApiKey = env.QLOO_API_KEY;
-		const qlooApiUrl = env.QLOO_API_URL;
-
-		if (!qlooApiKey || !qlooApiUrl) {
-			console.error('Qloo API key or URL is not set in environment variables.');
-			return fail(500, { message: 'Server configuration error.' });
+			filterRadius = data.get('filterLocationRadius')?.toString() || undefined;
+		} catch (e) {
+			console.error('Error parsing form data for search action:', e);
 		}
 
 		const options = {
@@ -249,95 +327,281 @@ export const actions: Actions = {
 			headers: { accept: 'application/json', 'X-Api-Key': `${qlooApiKey}` }
 		};
 
-		let insightsUrl = `${qlooApiUrl}v2/insights?filter.type=urn:entity:place`;
-
-		// Add selected place as a signal if available
-		if (selectedPlace) {
-			insightsUrl += `&signal.interests.entities=${selectedPlace}`;
-		}
-
-		// Add all gathered tag IDs as signals
-		const tagIds = Object.values(allQlooTagIds)
-			.flat()
-			.map((tag: any) => tag.tag_id)
-			.join(',');
-		if (tagIds) {
-			insightsUrl += `&signal.interests.tags=${tagIds}`;
-		}
-
-		// Add price range filter
-		if (priceRange) {
-			insightsUrl += `&filter.price_level.min=${priceRange}&filter.price_level.max=${priceRange}`;
-		}
-
-		// Add a dummy location filter for now
-		insightsUrl += `&filter.location=40.7128,-74.0060`; // New York City coordinates
-
-		console.log('Insights URL:', insightsUrl);
+		const insightsUrl = buildQlooInsightsUrl(
+			qlooApiUrl,
+			entityId,
+			locationQuery,
+			filterTags,
+			operatorFilterTags,
+			filterRadius,
+			priceRange
+		);
+		console.log('Dynamic Insights URL (search action):', insightsUrl);
 
 		try {
 			const response = await fetch(insightsUrl, options);
+			console.log(
+				`Qloo Insights API Response Status (dynamic search action): ${response.status} ${response.statusText}`
+			);
 			if (response.status === 200) {
 				const insights: InsightsResponse = await response.json();
-				console.log('Qloo Insights:', insights);
+				let verbose: VerboseEntity[] = [];
 
-				for (const entity of insights.results.entities) {
-					const prompt = `You are a food recommendation assistant. Based on the following information about a restaurant, please suggest 3 to 5 specific and popular dishes that a user should try.
-
-Restaurant Name: ${entity.name}
-Cuisine: ${cuisines || 'N/A'}
-Description: ${entity.properties?.description || 'No description available.'}
-Keywords: ${entity.properties?.keywords?.map((k) => k.name).join(', ') || 'No keywords available.'}
-Specialty Dishes: ${entity.properties?.specialty_dishes?.map((d) => d.name).join(', ') || 'No specialty dishes available.'}
-
-What are the must-try dishes at this restaurant?`;
-
-					const deepseekApiKey = env.DEEPSEEK_API_KEY;
-					if (!deepseekApiKey) {
-						console.error('DeepSeek API key is not set in environment variables.');
-						// Continue processing other entities or handle this error appropriately
-						continue;
-					}
-
-					try {
-						const deepseekResponse = await fetch('https://api.deepseek.com/chat/completions', {
-							method: 'POST',
-							headers: {
-								'Content-Type': 'application/json',
-								Authorization: `Bearer ${deepseekApiKey}`
-							},
-							body: JSON.stringify({
-								model: 'deepseek-chat',
-								messages: [
-									{ role: 'system', content: 'You are a helpful assistant.' },
-									{ role: 'user', content: prompt }
-								],
-								stream: false
-							})
-						});
-
-						if (deepseekResponse.status === 200) {
-							const deepseekResult = await deepseekResponse.json();
-							const foodSuggestions = deepseekResult.choices[0]?.message?.content;
-							console.log(`Food suggestions for ${entity.name}:`, foodSuggestions);
-							// TODO: Store food suggestions with the entity or process further
-						} else {
-							console.error(
-								`Error fetching DeepSeek suggestions for ${entity.name}: ${deepseekResponse.status} ${deepseekResponse.statusText}`
-							);
-						}
-					} catch (llmError) {
-						console.error(`Exception fetching DeepSeek suggestions for ${entity.name}:`, llmError);
-					}
+				if (insights.results?.entities?.length) {
+					verbose = processQlooEntities(insights.results.entities);
+					console.info('Verbose Places (dynamic search action):', JSON.stringify(verbose, null, 2));
+				} else {
+					console.log('Verbose Places (dynamic search action): []');
 				}
-				return { insights }; // Return insights after processing
+
+				if (insights.results && insights.results.entities && insights.results.entities.length > 0) {
+					const qlooEntityIds: Record<string, QlooEntity[] | null> = {
+						recommendedPlaces: insights.results.entities
+					};
+					const qlooTagIds: Record<string, Tag[] | null> = {};
+
+					// Generate AI suggestions for all entities in a single call
+					const deepseekApiKey = env.DEEPSEEK_API_KEY;
+					const aiSuggestions: Record<string, string> = {};
+
+					if (deepseekApiKey && verbose.length > 0) {
+						const systemPrompt = `You are a helpful assistant that provides concise, well-crafted suggestions or insights for places.
+						For each place provided, focus on what makes it unique or interesting, drawing from its description, keywords, and tags.
+						Do not suggest specific food dishes.
+						Your response MUST be a JSON object where keys are 'entity_id' and values are the string suggestions. Ensure all strings are properly escaped for JSON.`;
+
+						const userPrompt = `Provide a JSON object with suggestions for the following places. Each suggestion should be a concise string.
+${verbose
+	.map(
+		(entity) =>
+			`Entity ID: ${entity.entity_id}, Name: ${entity.name}, Description: ${
+				entity.properties?.description || 'N/A'
+			}, Keywords: ${
+				entity.properties?.keywords?.map((k) => k.name).join(', ') || 'N/A'
+			}, Tags: ${entity.tags?.map((t) => t.name).join(', ') || 'N/A'}`
+	)
+	.join('\n')}`;
+
+						try {
+							const deepseekResponse = await fetch('https://api.deepseek.com/chat/completions', {
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									Authorization: `Bearer ${deepseekApiKey}`
+								},
+								body: JSON.stringify({
+									model: 'deepseek-chat',
+									messages: [
+										{ role: 'system', content: systemPrompt },
+										{ role: 'user', content: userPrompt }
+									],
+									response_format: { type: 'json_object' }, // Request JSON output
+									stream: false,
+									max_tokens: 2000 // Increased max_tokens for larger responses
+								})
+							});
+
+							if (deepseekResponse.status === 200) {
+								const deepseekResult = await deepseekResponse.json();
+								try {
+									const parsedSuggestions = JSON.parse(
+										deepseekResult.choices[0]?.message?.content || '{}'
+									);
+									Object.assign(aiSuggestions, parsedSuggestions);
+									console.log('DeepSeek AI Suggestions (parsed):', aiSuggestions);
+								} catch (jsonError) {
+									console.error('Error parsing DeepSeek JSON response:', jsonError);
+								}
+							} else {
+								console.error(
+									`Error fetching DeepSeek suggestions: ${deepseekResponse.status} ${deepseekResponse.statusText}`
+								);
+							}
+						} catch (llmError) {
+							console.error('Exception fetching DeepSeek suggestions:', llmError);
+						}
+					}
+
+					return {
+						success: true,
+						qlooEntityIds,
+						qlooTagIds,
+						priceRange: priceRange,
+						verbose,
+						aiSuggestions
+					};
+				} else {
+					console.warn('Qloo Insights API returned no entities for the given dynamic criteria.');
+					return fail(404, {
+						success: false,
+						qlooEntityIds: {},
+						qlooTagIds: {},
+						priceRange,
+						message: 'No recommendations found for your preferences.'
+					});
+				}
 			} else {
-				console.error(`Error fetching Qloo insights: ${response.status} ${response.statusText}`);
+				console.error(
+					`Error fetching Qloo insights (dynamic search action): ${response.status} ${response.statusText}`
+				);
 				return fail(500, { message: 'Failed to fetch Qloo insights.' });
 			}
 		} catch (error) {
-			console.error('Exception fetching Qloo insights:', error);
+			console.error('Exception fetching Qloo insights (dynamic search action):', error);
 			return fail(500, { message: 'Failed to fetch Qloo insights.' });
 		}
 	}
+};
+
+// Mock data generation function
+function createMockQlooEntity(
+	name: string,
+	entity_id: string,
+	types: string[],
+	popularity: number,
+	description: string
+): QlooEntity {
+	return {
+		name,
+		entity_id,
+		types,
+		properties: {
+			description: description,
+			keywords: [],
+			specialty_dishes: [],
+			address: null,
+			phone: null,
+			website: null,
+			image: null,
+			business_rating: null,
+			price_level: null
+		},
+		popularity,
+		tags: []
+	};
+}
+
+export const load = async () => {
+	console.log('Load function in +page.server.ts initiated.');
+
+	const allRecommendations: QlooEntity[] = [
+		createMockQlooEntity(
+			'The Gourmet Bistro',
+			'entity-1',
+			['restaurant'],
+			0.95,
+			'A fine dining experience with a modern twist.'
+		),
+		createMockQlooEntity(
+			'Cafe Delights',
+			'entity-2',
+			['cafe'],
+			0.92,
+			'Cozy cafe with artisanal coffee and pastries.'
+		),
+		createMockQlooEntity(
+			'Sushi Haven',
+			'entity-3',
+			['restaurant', 'japanese'],
+			0.9,
+			'Authentic Japanese sushi and sashimi.'
+		),
+		createMockQlooEntity(
+			'Pasta Paradise',
+			'entity-4',
+			['restaurant', 'italian'],
+			0.88,
+			'Traditional Italian pasta dishes and wines.'
+		),
+		createMockQlooEntity(
+			'Burger Joint',
+			'entity-5',
+			['restaurant', 'american'],
+			0.85,
+			'Classic American burgers and shakes.'
+		),
+		createMockQlooEntity(
+			'Vegan Oasis',
+			'entity-6',
+			['restaurant', 'vegan'],
+			0.8,
+			'Healthy and delicious plant-based cuisine.'
+		),
+		createMockQlooEntity(
+			'Spice Route',
+			'entity-7',
+			['restaurant', 'indian'],
+			0.78,
+			'Exotic Indian flavors and aromatic curries.'
+		),
+		createMockQlooEntity(
+			'Mediterranean Grill',
+			'entity-8',
+			['restaurant', 'mediterranean'],
+			0.75,
+			'Fresh and vibrant Mediterranean dishes.'
+		),
+		createMockQlooEntity(
+			'Taco Truck',
+			'entity-9',
+			['food_truck', 'mexican'],
+			0.72,
+			'Quick and tasty street tacos.'
+		),
+		createMockQlooEntity(
+			'Pancake House',
+			'entity-10',
+			['restaurant', 'breakfast'],
+			0.7,
+			'All-day breakfast with a variety of pancakes.'
+		),
+		createMockQlooEntity(
+			'Seafood Shack',
+			'entity-11',
+			['restaurant', 'seafood'],
+			0.68,
+			'Fresh catches and ocean views.'
+		),
+		createMockQlooEntity(
+			'Pizza Palace',
+			'entity-12',
+			['restaurant', 'pizza'],
+			0.65,
+			'Hand-tossed pizzas with gourmet toppings.'
+		),
+		createMockQlooEntity(
+			'BBQ Pit',
+			'entity-13',
+			['restaurant', 'bbq'],
+			0.62,
+			'Smoky ribs and savory barbecue.'
+		),
+		createMockQlooEntity(
+			'Dessert Dream',
+			'entity-14',
+			['cafe', 'dessert'],
+			0.6,
+			'Sweet treats and decadent desserts.'
+		),
+		createMockQlooEntity(
+			'Smoothie Bar',
+			'entity-15',
+			['cafe', 'healthy'],
+			0.58,
+			'Refreshing smoothies and healthy snacks.'
+		)
+	];
+
+	const top5Recommendations = allRecommendations.slice(0, 5);
+	const otherRecommendations = allRecommendations.slice(5);
+
+	console.log('Returning mock recommendations:', {
+		top5: top5Recommendations.length,
+		other: otherRecommendations.length
+	});
+
+	return {
+		top5: top5Recommendations,
+		other: otherRecommendations
+	};
 };
