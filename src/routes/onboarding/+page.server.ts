@@ -210,6 +210,73 @@ function processQlooEntities(entities: QlooEntity[]): VerboseEntity[] {
 	}));
 }
 
+// Helper function to get AI suggestions
+async function getAiSuggestionsForEntities(
+	verboseEntities: VerboseEntity[]
+): Promise<Record<string, string>> {
+	const deepseekApiKey = env.DEEPSEEK_API_KEY;
+	const aiSuggestions: Record<string, string> = {};
+
+	if (!deepseekApiKey || verboseEntities.length === 0) {
+		return aiSuggestions;
+	}
+
+	const systemPrompt = `You are a helpful assistant that provides concise, well-crafted suggestions or insights for places.
+	For each place provided, focus on what makes it unique or interesting, drawing from its description, keywords, and tags.
+	Do not suggest specific food dishes.
+	Your response MUST be a JSON object where keys are 'entity_id' and values are the string suggestions. Ensure all strings are properly escaped for JSON.`;
+
+	const userPrompt = `Provide a JSON object with suggestions for the following places. Each suggestion should be a concise string.
+${verboseEntities
+	.map(
+		(entity) =>
+			`Entity ID: ${entity.entity_id}, Name: ${entity.name}, Description: ${
+				entity.properties?.description || 'N/A'
+			}, Keywords: ${
+				entity.properties?.keywords?.map((k) => k.name).join(', ') || 'N/A'
+			}, Tags: ${entity.tags?.map((t) => t.name).join(', ') || 'N/A'}`
+	)
+	.join('\n')}`;
+
+	try {
+		const deepseekResponse = await fetch('https://api.deepseek.com/chat/completions', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${deepseekApiKey}`
+			},
+			body: JSON.stringify({
+				model: 'deepseek-chat',
+				messages: [
+					{ role: 'system', content: systemPrompt },
+					{ role: 'user', content: userPrompt }
+				],
+				response_format: { type: 'json_object' }, // Request JSON output
+				stream: false,
+				max_tokens: 2000 // Increased max_tokens for larger responses
+			})
+		});
+
+		if (deepseekResponse.status === 200) {
+			const deepseekResult = await deepseekResponse.json();
+			try {
+				const parsedSuggestions = JSON.parse(deepseekResult.choices[0]?.message?.content || '{}');
+				Object.assign(aiSuggestions, parsedSuggestions);
+				console.log('DeepSeek AI Suggestions (parsed):', aiSuggestions);
+			} catch (jsonError) {
+				console.error('Error parsing DeepSeek JSON response:', jsonError);
+			}
+		} else {
+			console.error(
+				`Error fetching DeepSeek suggestions: ${deepseekResponse.status} ${deepseekResponse.statusText}`
+			);
+		}
+	} catch (llmError) {
+		console.error('Exception fetching DeepSeek suggestions:', llmError);
+	}
+	return aiSuggestions;
+}
+
 export const actions: Actions = {
 	getEntityId: async ({ request, cookies }) => {
 		console.log('Action: getEntityId - initiated');
@@ -361,66 +428,7 @@ export const actions: Actions = {
 					const qlooTagIds: Record<string, Tag[] | null> = {};
 
 					// Generate AI suggestions for all entities in a single call
-					const deepseekApiKey = env.DEEPSEEK_API_KEY;
-					const aiSuggestions: Record<string, string> = {};
-
-					if (deepseekApiKey && verbose.length > 0) {
-						const systemPrompt = `You are a helpful assistant that provides concise, well-crafted suggestions or insights for places.
-						For each place provided, focus on what makes it unique or interesting, drawing from its description, keywords, and tags.
-						Do not suggest specific food dishes.
-						Your response MUST be a JSON object where keys are 'entity_id' and values are the string suggestions. Ensure all strings are properly escaped for JSON.`;
-
-						const userPrompt = `Provide a JSON object with suggestions for the following places. Each suggestion should be a concise string.
-${verbose
-	.map(
-		(entity) =>
-			`Entity ID: ${entity.entity_id}, Name: ${entity.name}, Description: ${
-				entity.properties?.description || 'N/A'
-			}, Keywords: ${
-				entity.properties?.keywords?.map((k) => k.name).join(', ') || 'N/A'
-			}, Tags: ${entity.tags?.map((t) => t.name).join(', ') || 'N/A'}`
-	)
-	.join('\n')}`;
-
-						try {
-							const deepseekResponse = await fetch('https://api.deepseek.com/chat/completions', {
-								method: 'POST',
-								headers: {
-									'Content-Type': 'application/json',
-									Authorization: `Bearer ${deepseekApiKey}`
-								},
-								body: JSON.stringify({
-									model: 'deepseek-chat',
-									messages: [
-										{ role: 'system', content: systemPrompt },
-										{ role: 'user', content: userPrompt }
-									],
-									response_format: { type: 'json_object' }, // Request JSON output
-									stream: false,
-									max_tokens: 2000 // Increased max_tokens for larger responses
-								})
-							});
-
-							if (deepseekResponse.status === 200) {
-								const deepseekResult = await deepseekResponse.json();
-								try {
-									const parsedSuggestions = JSON.parse(
-										deepseekResult.choices[0]?.message?.content || '{}'
-									);
-									Object.assign(aiSuggestions, parsedSuggestions);
-									console.log('DeepSeek AI Suggestions (parsed):', aiSuggestions);
-								} catch (jsonError) {
-									console.error('Error parsing DeepSeek JSON response:', jsonError);
-								}
-							} else {
-								console.error(
-									`Error fetching DeepSeek suggestions: ${deepseekResponse.status} ${deepseekResponse.statusText}`
-								);
-							}
-						} catch (llmError) {
-							console.error('Exception fetching DeepSeek suggestions:', llmError);
-						}
-					}
+					const aiSuggestions = await getAiSuggestionsForEntities(verbose);
 
 					return {
 						success: true,
@@ -483,125 +491,4 @@ function createMockQlooEntity(
 
 export const load = async () => {
 	console.log('Load function in +page.server.ts initiated.');
-
-	const allRecommendations: QlooEntity[] = [
-		createMockQlooEntity(
-			'The Gourmet Bistro',
-			'entity-1',
-			['restaurant'],
-			0.95,
-			'A fine dining experience with a modern twist.'
-		),
-		createMockQlooEntity(
-			'Cafe Delights',
-			'entity-2',
-			['cafe'],
-			0.92,
-			'Cozy cafe with artisanal coffee and pastries.'
-		),
-		createMockQlooEntity(
-			'Sushi Haven',
-			'entity-3',
-			['restaurant', 'japanese'],
-			0.9,
-			'Authentic Japanese sushi and sashimi.'
-		),
-		createMockQlooEntity(
-			'Pasta Paradise',
-			'entity-4',
-			['restaurant', 'italian'],
-			0.88,
-			'Traditional Italian pasta dishes and wines.'
-		),
-		createMockQlooEntity(
-			'Burger Joint',
-			'entity-5',
-			['restaurant', 'american'],
-			0.85,
-			'Classic American burgers and shakes.'
-		),
-		createMockQlooEntity(
-			'Vegan Oasis',
-			'entity-6',
-			['restaurant', 'vegan'],
-			0.8,
-			'Healthy and delicious plant-based cuisine.'
-		),
-		createMockQlooEntity(
-			'Spice Route',
-			'entity-7',
-			['restaurant', 'indian'],
-			0.78,
-			'Exotic Indian flavors and aromatic curries.'
-		),
-		createMockQlooEntity(
-			'Mediterranean Grill',
-			'entity-8',
-			['restaurant', 'mediterranean'],
-			0.75,
-			'Fresh and vibrant Mediterranean dishes.'
-		),
-		createMockQlooEntity(
-			'Taco Truck',
-			'entity-9',
-			['food_truck', 'mexican'],
-			0.72,
-			'Quick and tasty street tacos.'
-		),
-		createMockQlooEntity(
-			'Pancake House',
-			'entity-10',
-			['restaurant', 'breakfast'],
-			0.7,
-			'All-day breakfast with a variety of pancakes.'
-		),
-		createMockQlooEntity(
-			'Seafood Shack',
-			'entity-11',
-			['restaurant', 'seafood'],
-			0.68,
-			'Fresh catches and ocean views.'
-		),
-		createMockQlooEntity(
-			'Pizza Palace',
-			'entity-12',
-			['restaurant', 'pizza'],
-			0.65,
-			'Hand-tossed pizzas with gourmet toppings.'
-		),
-		createMockQlooEntity(
-			'BBQ Pit',
-			'entity-13',
-			['restaurant', 'bbq'],
-			0.62,
-			'Smoky ribs and savory barbecue.'
-		),
-		createMockQlooEntity(
-			'Dessert Dream',
-			'entity-14',
-			['cafe', 'dessert'],
-			0.6,
-			'Sweet treats and decadent desserts.'
-		),
-		createMockQlooEntity(
-			'Smoothie Bar',
-			'entity-15',
-			['cafe', 'healthy'],
-			0.58,
-			'Refreshing smoothies and healthy snacks.'
-		)
-	];
-
-	const top5Recommendations = allRecommendations.slice(0, 5);
-	const otherRecommendations = allRecommendations.slice(5);
-
-	console.log('Returning mock recommendations:', {
-		top5: top5Recommendations.length,
-		other: otherRecommendations.length
-	});
-
-	return {
-		top5: top5Recommendations,
-		other: otherRecommendations
-	};
 };

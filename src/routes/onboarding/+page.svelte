@@ -62,6 +62,7 @@
 	type PageDataExtended = PageData & {
 		top5?: QlooEntity[];
 		other?: QlooEntity[];
+		aiSuggestions?: Record<string, string>; // Add aiSuggestions to PageDataExtended
 	};
 
 	type PageProps = {
@@ -78,6 +79,7 @@
 	let entityName = $state<string | undefined>(undefined); // Add state for entityName
 
 	let showForm = $state<boolean>(true); // New state variable to control form/results display
+	let currentAiSuggestions: any = $state({}); // Changed type to any to bypass strict TS error
 
 	// Persist verbose results using runed PersistedState (no manual effects needed)
 	const verboseStore = new PersistedState<VerbosePlace[]>('qloo_verbose_latest_array', [], {
@@ -228,6 +230,12 @@
 					// Handle redirects if any
 				} else if (result.type === 'success' && Array.isArray(result.data?.verbose)) {
 					verboseStore.current = result.data.verbose;
+					// Update currentAiSuggestions from the action result
+					if (result.data?.aiSuggestions) {
+						currentAiSuggestions = result.data.aiSuggestions;
+					} else {
+						currentAiSuggestions = {};
+					}
 					showForm = false; // Transition to results state on successful form submission
 				} else if (result.type === 'success' && result.data?.message) {
 					// If there's a message but no verbose data, stay on form and show message
@@ -505,7 +513,7 @@
 					name={entity.name}
 					cuisine={entity.types.length > 0 ? entity.types[0] : 'Unknown Cuisine'}
 					address={entity.properties?.address || 'N/A'}
-					aiSuggestion={form?.aiSuggestions?.[entity.entity_id] || 'No AI suggestion available.'}
+					aiSuggestion={data?.aiSuggestions?.[entity.entity_id] || 'No AI suggestion available.'}
 				/>
 			{/each}
 		</div>
@@ -519,7 +527,7 @@
 					name={entity.name}
 					cuisine={entity.types.length > 0 ? entity.types[0] : 'Unknown Cuisine'}
 					address={entity.properties?.address || 'N/A'}
-					aiSuggestion={form?.aiSuggestions?.[entity.entity_id] || 'No AI suggestion available.'}
+					aiSuggestion={currentAiSuggestions[entity.entity_id] || 'No AI suggestion available.'}
 				/>
 			{/each}
 		</div>
